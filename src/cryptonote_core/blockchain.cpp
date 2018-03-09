@@ -2899,8 +2899,6 @@ static uint64_t get_fee_quantization_mask()
   if (mask == 0)
   {
     mask = 1;
-    for (size_t n = PER_KB_FEE_QUANTIZATION_DECIMALS; n < CRYPTONOTE_DISPLAY_DECIMAL_POINT; ++n)
-      mask *= 10;
   }
   return mask;
 }
@@ -2917,7 +2915,7 @@ uint64_t Blockchain::get_dynamic_per_kb_fee(uint64_t block_reward, size_t median
   uint64_t unscaled_fee_per_kb = (fee_per_kb_base * min_block_size / median_block_size);
   uint64_t hi, lo = mul128(unscaled_fee_per_kb, block_reward, &hi);
   static_assert(DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD % 1000000 == 0, "DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD must be divisible by 1000000");
-  static_assert(DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD / 1000000 <= std::numeric_limits<uint32_t>::max(), "DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD is too large");
+  //static_assert(DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD / 1000000 <= std::numeric_limits<uint32_t>::max(), "DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD is too large");
 
   // divide in two steps, since the divisor must be 32 bits, but DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD isn't
   div128_32(hi, lo, DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD / 1000000, &hi, &lo);
@@ -2938,19 +2936,14 @@ bool Blockchain::check_fee(size_t blob_size, uint64_t fee) const
   const uint8_t version = get_current_hard_fork_version();
 
   uint64_t fee_per_kb;
-  if (version < HF_VERSION_DYNAMIC_FEE)
-  {
-    fee_per_kb = FEE_PER_KB;
-  }
-  else
-  {
+  
     uint64_t median = m_current_block_cumul_sz_limit / 2;
     uint64_t already_generated_coins = m_db->height() ? m_db->get_block_already_generated_coins(m_db->height() - 1) : 0;
     uint64_t base_reward;
     if (!get_block_reward(median, 1, already_generated_coins, base_reward, version))
       return false;
     fee_per_kb = get_dynamic_per_kb_fee(base_reward, median, version);
-  }
+  
   MDEBUG("Using " << print_money(fee) << "/kB fee");
 
   uint64_t needed_fee = blob_size / 1024;
@@ -2969,9 +2962,6 @@ bool Blockchain::check_fee(size_t blob_size, uint64_t fee) const
 uint64_t Blockchain::get_dynamic_per_kb_fee_estimate(uint64_t grace_blocks) const
 {
   const uint8_t version = get_current_hard_fork_version();
-
-  if (version < HF_VERSION_DYNAMIC_FEE)
-    return FEE_PER_KB;
 
   if (grace_blocks >= CRYPTONOTE_REWARD_BLOCKS_WINDOW)
     grace_blocks = CRYPTONOTE_REWARD_BLOCKS_WINDOW - 1;
